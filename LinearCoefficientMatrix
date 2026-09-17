@@ -1,0 +1,245 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+
+
+PD_params = {'R': 6, 'S': 3, 'T': 12, 'P': 5}
+
+w_I = 0.01
+w_G = 0.01
+
+n_values = [2, 3, 4, 20]
+Lambda_list = np.arange(1, 501)
+Lambda_report = [1, 100, 150, 200, 300, 400, 500]
+
+
+# Payoffs
+
+def calculate_payoffs(n, R, S, T, P):
+    pi_C = np.zeros(n + 1)
+    pi_D = np.zeros(n + 1)
+    G = np.zeros(n + 1)
+
+    for j in range(n + 1):
+        pi_C[j] = (
+            R * (j - 1) / (n - 1)
+            + S * (n - j) / (n - 1)
+        )
+
+        pi_D[j] = (
+            T * j / (n - 1)
+            + P * (n - j - 1) / (n - 1)
+        )
+
+        G[j] = (
+            (j / n) * pi_C[j]
+            + ((n - j) / n) * pi_D[j]
+        )
+
+    return pi_C, pi_D, G
+
+
+def build_linear_matrix(n, R, S, T, P, w_I, w_G, Lambda):
+
+    pi_C, pi_D, G = calculate_payoffs(n, R, S, T, P)
+
+
+    a = np.zeros(n + 1)
+    b = np.zeros(n + 1)
+
+    for j in range(n + 1):
+        factor = j * (n - j) / (n - 1)
+
+        a[j] = factor * (1 + w_I * pi_C[j]) # j -> j+1
+
+        b[j] = factor * (1 + w_I * pi_D[j]) # j -> j-1
+
+  
+    A = np.zeros((n + 1, n + 1))
+    for j in range(n + 1):
+        A[j, j] -= (a[j] + b[j])
+        if j < n:
+            A[j + 1, j] += a[j]
+        if j > 0:
+            A[j - 1, j] += b[j]
+    M = A + Lambda * w_G * np.diag(G)
+
+    return M, pi_C, pi_D, G
+
+
+
+def dominant_eigenpair(M):
+    """
+    Return dominant eigenvalue (largest real part)
+    and normalized dominant eigenvector (sum = 1).
+    """
+    eigenvalues, eigenvectors = np.linalg.eig(M)
+
+    idx = np.argmax(eigenvalues.real)
+
+    eigval = eigenvalues[idx].real
+    vec = eigenvectors[:, idx]
+    vec = np.real_if_close(vec).astype(float)
+    if np.sum(vec) < 0:
+        vec = -vec
+
+    vec[np.abs(vec) < 1e-12] = 0.0
+    vec[(vec < 0) & (vec > -1e-10)] = 0.0
+
+    if np.min(vec) < -1e-8:
+        print("Warning: dominant eigenvector has noticeable negative entries.")
+        print("Minimum entry =", np.min(vec))
+
+    total = np.sum(vec)
+    if abs(total) < 1e-14:
+        raise ValueError("Dominant eigenvector cannot be normalized.")
+
+    vec = vec / total
+
+    return eigval, vec
+
+
+
+def analyze_single_n(n, params, Lambda_list, w_I, w_G, Lambda_report):
+
+    _, _, G = calculate_payoffs(n=n, **params)
+    x_values = np.arange(n + 1) / n
+
+    states = []
+    eigenvalues = []
+    cooperation_values = []
+    payoff_values = []
+
+    for Lambda in Lambda_list:
+
+        M, _, _, G = build_linear_matrix(
+            n=n,
+            **params,
+            w_I=w_I,
+            w_G=w_G,
+            Lambda=Lambda
+        )
+
+        eigval, f = dominant_eigenpair(M)
+
+        states.append(f)
+        eigenvalues.append(eigval)
+        cooperation_values.append(np.dot(x_values, f))
+        payoff_values.append(np.dot(G, f))
+
+    states = np.array(states)
+    eigenvalues = np.array(eigenvalues)
+    cooperation_values = np.array(cooperation_values)
+    payoff_values = np.array(payoff_values)
+
+    # Save only selected Lambda dominant eigenvectors
+    selected_vectors = {}
+    selected_eigenvalues = {}
+    selected_cooperation = {}
+    selected_payoff = {}
+
+    for Lam in Lambda_report:
+        if Lam not in Lambda_list:
+            continue
+
+        idx = np.where(Lambda_list == Lam)[0][0]
+
+        selected_vectors[Lam] = states[idx]
+        selected_eigenvalues[Lam] = eigenvalues[idx]
+        selected_cooperation[Lam] = cooperation_values[idx]
+        selected_payoff[Lam] = payoff_values[idx]
+
+    return {
+        "n": n,
+        "Lambda_list": Lambda_list,
+        "states": states,
+        "eigenvalues": eigenvalues,
+        "cooperation": cooperation_values,
+        "payoff": payoff_values,
+        "selected_vectors": selected_vectors,
+        "selected_eigenvalues": selected_eigenvalues,
+        "selected_cooperation": selected_cooperation,
+        "selected_payoff": selected_payoff,
+        "G": G
+    }
+
+
+results = {}
+
+for n in n_values:
+
+    results[n] = analyze_single_n(
+        n=n,
+        params=PD_params,
+        Lambda_list=Lambda_list,
+        w_I=w_I,
+        w_G=w_G,
+        Lambda_report=Lambda_report
+    )
+
+
+# dominant eigenvectors at selected Lambda values
+
+for n in n_values:
+
+    print(f"n = {n}")
+    for Lam in Lambda_report:
+
+        f = results[n]["selected_vectors"][Lam]
+        eigval = results[n]["selected_eigenvalues"][Lam]
+        coop = results[n]["selected_cooperation"][Lam]
+        payoff = results[n]["selected_payoff"][Lam]
+
+        print(f"\nLambda = {Lam}")
+        print(f"Dominant eigenvalue = {eigval:.10f}")
+        print(f"Average cooperation = {coop:.10f}")
+        print(f"Average payoff = {payoff:.10f}")
+        print("Dominant eigenvector =")
+        print(np.array2string(f, precision=8, separator=", "))
+
+    print("\n")
+
+
+# Plot average cooperation for all n
+
+plt.figure(figsize=(8, 5.5))
+
+for n in n_values:
+    plt.plot(
+        results[n]["Lambda_list"],
+        results[n]["cooperation"],
+        linewidth=2.3,
+        label=rf"$n={n}$"
+    )
+
+plt.xlabel(r"Speed of group-level selection $\Lambda$", fontsize=12)
+plt.ylabel(r"Average cooperation $\langle x \rangle_f$", fontsize=12)
+plt.title("Average Cooperation vs. " + r"$\Lambda$" + " in the Linear Model", fontsize=13)
+plt.xlim(Lambda_list[0], Lambda_list[-1])
+plt.ylim(0, 1)
+plt.grid(alpha=0.3)
+plt.legend()
+plt.tight_layout()
+plt.show()
+
+
+# Plot average payoff for all n
+
+plt.figure(figsize=(8, 5.5))
+
+for n in n_values:
+    plt.plot(
+        results[n]["Lambda_list"],
+        results[n]["payoff"],
+        linewidth=2.3,
+        label=rf"$n={n}$"
+    )
+
+plt.xlabel(r"Speed of group-level selection $\Lambda$", fontsize=12)
+plt.ylabel(r"Average payoff $\langle G \rangle_f$", fontsize=12)
+plt.title("Average Payoff vs. " + r"$\Lambda$" + " in the Linear Model", fontsize=13)
+plt.xlim(Lambda_list[0], Lambda_list[-1])
+plt.grid(alpha=0.3)
+plt.legend()
+plt.tight_layout()
+plt.show()

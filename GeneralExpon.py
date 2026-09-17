@@ -5,9 +5,9 @@ PD_params = {'R': 6, 'S': 3, 'T': 12, 'P': 5}
 w_I = 0.01
 w_G = 0.01
 
-Lambda_list = np.linspace(1, 100, 100)
+Lambda_list = np.linspace(1, 200, 100)
 
-t_end = 200
+t_end = 1000
 dt = 0.01
 
 def rk4_step(f, t, y, dt):
@@ -244,5 +244,106 @@ plt.xlim(0, 100)
 plt.ylim(4.5, 8.0)
 plt.grid(alpha=0.3)
 plt.legend()
+plt.tight_layout()
+plt.show()
+
+
+
+# third graph
+state_results = {
+    2: states_n2,
+    3: states_n3,
+    4: states_n4,
+    20: states_n20
+}
+
+fig, axes = plt.subplots(2, 2, figsize=(13, 9), sharex=True, sharey=True)
+
+axes = axes.flatten()
+
+for ax, n in zip(axes, [2, 3, 4, 20]):
+
+    steady_states = state_results[n]
+
+    state_colors = plt.cm.viridis(
+        np.linspace(0, 1, n + 1)
+    )
+
+    for i in range(n + 1):
+        ax.plot(
+            Lambda_list,
+            steady_states[:, i],
+            color=state_colors[i],
+            linewidth=2.0,
+            label=rf"$f_{{{i}}}$"
+        )
+
+    ax.set_title(
+        rf"$n={n}$",
+        fontsize=13
+    )
+
+    ax.set_xlim(0, 100)
+    ax.set_ylim(0, 1)
+    ax.grid(alpha=0.3)
+
+    if n <= 4:
+        ax.legend(
+            fontsize=9,
+            loc="best"
+        )
+
+    else:
+        normalization = plt.Normalize(
+            vmin=0,
+            vmax=n
+        )
+
+        color_mapping = plt.cm.ScalarMappable(
+            norm=normalization,
+            cmap="viridis"
+        )
+
+        color_mapping.set_array([])
+
+        colorbar = fig.colorbar(
+            color_mapping,
+            ax=ax,
+            pad=0.02
+        )
+
+        colorbar.set_label(
+            r"Number of cooperators $i$"
+        )
+
+        colorbar.set_ticks([0, 5, 10, 15, 20])
+
+axes[2].set_xlabel(
+    r"Speed of group-level selection $\Lambda$",
+    fontsize=12
+)
+
+axes[3].set_xlabel(
+    r"Speed of group-level selection $\Lambda$",
+    fontsize=12
+)
+
+axes[0].set_ylabel(
+    r"Steady-state frequency $f_i^*$",
+    fontsize=12
+)
+
+axes[2].set_ylabel(
+    r"Steady-state frequency $f_i^*$",
+    fontsize=12
+)
+
+fig.suptitle(
+    "Steady-State Group Distributions "
+    r"vs. $\Lambda$ in the Traulsen PD Model",
+    fontsize=15,
+    y=1.01
+)
+
 plt.tight_layout()
 plt.show()

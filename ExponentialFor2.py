@@ -66,8 +66,9 @@ def continuation_independent(params, Lambda_list):
     f2_vals = []
     for Lam in Lambda_list:
         system = make_TN_system(**params, w_I=w_I, w_G=w_G, Lambda=Lam)
-        # y_init = np.array([0.33, 0.33, 0.34])
-        y_init = np.array([0.01, 0.01, 0.98])
+        y_init = np.array([0.33, 0.33, 0.34])
+        # y_init = np.array([0.01, 0.01, 0.98])
+        # y_init = np.array([0, 0, 1])
         # y_init = np.array([0.98, 0.01, 0.01])
         y_steady = solve_to_steady(system, y_init)
 
@@ -83,13 +84,13 @@ def continuation_independent(params, Lambda_list):
 f0_PD, f1_PD, f2_PD = continuation_independent(PD_params, Lambda_list)
 
 
-threshold = 0.998
-start_idx = np.where(Lambda_list >= 10)[0][0]
-for i in range(start_idx, len(Lambda_list)):
-    if f2_PD[i] < threshold:
-        lambda_target = Lambda_list[i]
-        break
-print(lambda_target)
+# threshold = 0.998
+# start_idx = np.where(Lambda_list >= 10)[0][0]
+# for i in range(start_idx, len(Lambda_list)):
+#     if f2_PD[i] < threshold:
+#         lambda_target = Lambda_list[i]
+#         break
+# print(lambda_target)
 
 # avg_coop_HD = 0.5 * f1_HD + f2_HD
 avg_coop_PD = 0.5 * f1_PD + f2_PD
